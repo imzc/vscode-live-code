@@ -2,6 +2,7 @@
 // The module 'vscode' contains the VS Code extensibility API
 // Import the module and reference it with the alias vscode in your code below
 import * as vscode from 'vscode';
+import * as ts from 'typescript';
 
 var output:vscode.OutputChannel;
 
@@ -39,6 +40,17 @@ function handleDocumentChange(document:vscode.TextDocument){
     }
 
     output.appendLine(`Document changed: ${document.uri.toString()}`);
+
+    var source = document.getText();
+    var tsconfig:ts.CompilerOptions = {
+        target: ts.ScriptTarget.ES5
+    };
+    var compileResult = ts.transpileModule(source, { compilerOptions: tsconfig });
+    var javascript = compileResult.outputText;
+
+    output.clear();
+    output.appendLine(javascript);
+    
 }
 
 function isTypeScriptFile(document:vscode.TextDocument){
