@@ -50,7 +50,11 @@ function showPreview(document:vscode.TextDocument){
     var dynamicHtmlUrl= GetPreviewUri(resource); // "livecode:/c:/work/demo/test.ts?file:///c:/work/demo/test.ts"
 
     // Error because livecode:// is unknown.
-    return vscode.commands.executeCommand('vscode.previewHtml', dynamicHtmlUrl).then(()=>{},(e)=>{
+    return vscode.commands.executeCommand('vscode.previewHtml', 
+        dynamicHtmlUrl,
+        vscode.ViewColumn.Three,
+        `Preview ${path.basename(resource.fsPath)}`
+        ).then(()=>{},(e)=>{
             output.appendLine(e)
         });
 }
@@ -72,6 +76,18 @@ function compileTypeScript(source:string){
     };
     var compileResult = ts.transpileModule(source, { compilerOptions: tsconfig });
     var javascript = compileResult.outputText;
-    var scriptTag = `<script> ${javascript} </script>`;
+    var scriptTag = 
+    `<script> 
+        try{
+            eval(${JSON.stringify(javascript)});
+        }
+        catch(e){
+            var error = document.createElement('p');
+            error.style.color="#e50";
+            error.style.fontSize="larger";
+            error.textContent = e;
+            document.body.appendChild(error);
+        }  
+    </script>`;
     return scriptTag;
 }
