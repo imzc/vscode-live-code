@@ -4,6 +4,7 @@
 import * as vscode from 'vscode';
 import * as ts from 'typescript';
 import * as path from 'path';
+import { LiveCodeDocumentContentProvider } from './LiveCodeDocumentContentProvider';
 
 var output:vscode.OutputChannel;
 
@@ -14,6 +15,9 @@ export function activate(context: vscode.ExtensionContext) {
     output = vscode.window.createOutputChannel("Live Code");
     output.show(true);
     output.appendLine("Live Code Started!");
+    
+	let provider = new LiveCodeDocumentContentProvider(context,compileTypeScript);
+	let registration = vscode.workspace.registerTextDocumentContentProvider('livecode', provider);
 
     // The command has been defined in the package.json file
     // Now provide the implementation of the command with  registerCommand
@@ -22,11 +26,17 @@ export function activate(context: vscode.ExtensionContext) {
         var document = vscode.window.activeTextEditor.document;
         showPreview(document);
     });
-    context.subscriptions.push(disposable);
 
     vscode.workspace.onDidChangeTextDocument(event=>{
-        handleDocumentChange(event.document);
+        var document = event.document;
+        if(!isTypeScriptFile(document)){
+            return;
+        }
+
+        provider.update(GetPreviewUri(document.uri));
     });
+    
+    context.subscriptions.push(disposable,registration);
 }
 
 // this method is called when your extension is deactivated
@@ -34,39 +44,19 @@ export function deactivate() {
 }
 
 
-function handleDocumentChange(document:vscode.TextDocument){
-    
-    if(!isTypeScriptFile(document)){
-        return;
-    }
-
-    output.appendLine(`Document changed: ${document.uri.toString()}`);
-
-    var source = document.getText();
-    var tsconfig:ts.CompilerOptions = {
-        target: ts.ScriptTarget.ES5
-    };
-    var compileResult = ts.transpileModule(source, { compilerOptions: tsconfig });
-    var javascript = compileResult.outputText;
-
-    output.clear();
-    output.appendLine(javascript);
-    
-}
-
 function showPreview(document:vscode.TextDocument){
     
     var resource = document.uri;
-    var dynamicHtmlUrl= GetPreviewUri(resource); // "livecode:/preview?file:///c:/work/demo/test.ts"
+    var dynamicHtmlUrl= GetPreviewUri(resource); // "livecode:/c:/work/demo/test.ts?file:///c:/work/demo/test.ts"
 
     // Error because livecode:// is unknown.
-    return vscode.commands.executeCommand('vscode.previewHtml',
-		dynamicHtmlUrl,
-		`Preview '${path.basename(resource.fsPath)}'`);
+    return vscode.commands.executeCommand('vscode.previewHtml', dynamicHtmlUrl).then(()=>{},(e)=>{
+            output.appendLine(e)
+        });
 }
 
 function GetPreviewUri(uri:vscode.Uri){
-    return uri.with({ scheme: 'livecode', path: 'preview', query: uri.toString() });
+    return uri.with({ scheme: 'livecode', path: uri.path, query: uri.toString() });
 }
 
 
@@ -74,4 +64,14 @@ function GetPreviewUri(uri:vscode.Uri){
 function isTypeScriptFile(document:vscode.TextDocument){
     return document.languageId === 'typescript'
 		&& document.uri.scheme !== 'livecode'; // prevent processing of own documents
+}
+
+function compileTypeScript(source:string){
+    var tsconfig:ts.CompilerOptions = {
+        target: ts.ScriptTarget.ES5
+    };
+    var compileResult = ts.transpileModule(source, { compilerOptions: tsconfig });
+    var javascript = compileResult.outputText;
+    var scriptTag = `<script> ${javascript} </script>`;
+    return scriptTag;
 }
