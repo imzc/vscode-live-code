@@ -16,15 +16,32 @@ export function activate(context: vscode.ExtensionContext) {
     // The command has been defined in the package.json file
     // Now provide the implementation of the command with  registerCommand
     // The commandId parameter must match the command field in package.json
-    let disposable = vscode.commands.registerCommand('livecode.previewTypeScript', () => {
-        
-        output.appendLine("Execute command preview TypeScript");
-
+    let disposable = vscode.commands.registerCommand('livecode.previewTypeScript', () => {      
+        var document = vscode.window.activeTextEditor.document;
+        handleDocumentChange(document);
     });
-
     context.subscriptions.push(disposable);
+
+    vscode.workspace.onDidChangeTextDocument(event=>{
+        handleDocumentChange(event.document);
+    });
 }
 
 // this method is called when your extension is deactivated
 export function deactivate() {
+}
+
+
+function handleDocumentChange(document:vscode.TextDocument){
+    
+    if(!isTypeScriptFile(document)){
+        return;
+    }
+
+    output.appendLine(`Document changed: ${document.uri.toString()}`);
+}
+
+function isTypeScriptFile(document:vscode.TextDocument){
+    return document.languageId === 'typescript'
+		&& document.uri.scheme !== 'livecode'; // prevent processing of own documents
 }
